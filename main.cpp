@@ -14,7 +14,15 @@
 #include <stdio.h>
 #include <umfpack.h>
 
+#include "mpsReader.h"
+#include "data.h"
+
 using Eigen::MatrixXd;
+using namespace std;
+
+double pInf = numeric_limits<double>::infinity();
+double nInf = -numeric_limits<double>::infinity();
+double EPSILON_1 = 1e-5;
 
 // gerador de matrizes inversiveis B aleatorias (it_max e o grau de aleatoriedade)
 Eigen::MatrixXd gen_random_non_singular_mat(int n, int it_max)
@@ -40,89 +48,88 @@ Eigen::MatrixXd gen_random_non_singular_mat(int n, int it_max)
 // cria matriz E aleatoria 
 std::pair<int, Eigen::VectorXd> gen_random_eta_mat(int n)
 {
-  int p = rand() % n;
-  Eigen::VectorXd d = Eigen::VectorXd::Random(n);
+	int p = rand() % n;
+	Eigen::VectorXd d = Eigen::VectorXd::Random(n);
 
-  while (std::abs(d[p]) < 0.000001)
-  {
-    d = Eigen::VectorXd::Random(n);
-  }
+	while (std::abs(d[p]) < 0.000001)
+	{
+		d = Eigen::VectorXd::Random(n);
+	}
 
-  return std::make_pair(p, d);
+	return std::make_pair(p, d);
 }
 
+void test_eigen(int n)
+{
+	Eigen::MatrixXd B_dense = gen_random_non_singular_mat(n, 20); // generating a random non-singular matrix
+
+	Eigen::SparseMatrix<double> B = B_dense.sparseView(); // compressing the matrix, converting it to a sparse matrix (seboso, nao faça)
+
+	// Criando decomposicao LU para a matriz esparsa B usando UMFPACK
+	double *null = (double *) NULL ;
+	void *Symbolic, *Numeric ;
+
+	(void) umfpack_di_symbolic (n, n, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), &Symbolic, null, null);
+	(void) umfpack_di_numeric (B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), Symbolic, &Numeric, null, null);
+
+	// Resolvendo o sistema Bd = a varias vezes, reutilizando a mesma decomposicao LU de B para varios vetores a diferentes
+	Eigen::VectorXd d(n);
+
+	for (int i = 0; i < 100; i++)
+	{
+		Eigen::VectorXd a = Eigen::VectorXd::Random(n);
+
+		(void) umfpack_di_solve(UMFPACK_A, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), d.data(), a.data(), Numeric, null, null);
+
+		// verificando se de fato Bd = a
+		if ((B * d - a).norm() > 0.0000001)
+		{
+			std::cout << "Deu errado" << std::endl;
+			exit(0);
+		}
+	}
+
+	umfpack_di_free_symbolic (&Symbolic);
+	umfpack_di_free_numeric (&Numeric);
+
+	// gerando matriz E aleatoria (apenas a coluna e sua localizacao sao necessarias para representa-la)
+	auto [eta_idx, eta_col] = gen_random_eta_mat(n);
+
+	// matriz E representada na tora, apenas para fins ilustrativos
+	Eigen::MatrixXd E = Eigen::MatrixXd::Identity(n,n); 
+	E.col(eta_idx) = eta_col;
+
+	std::cout << "Antiga matriz B:\n" << B.toDense() << std::endl << std::endl;
+	std::cout << "Nova matriz B:\n" << B * E << std::endl;
+}
 
 
 int main(int argc, char** argv)
 {
-    int seed = std::atoi(argv[2]);
-    // srand(time(NULL));
-    srand(seed);
+	std::string mps_path = argv[1];
+	int pre_process = std::stoi(argv[2]); // can be 1 or 0 to activate it or not
 
-    int n = std::atoi(argv[1]);
+	mpsReader mps;
+	mps.read(mps_path, pre_process);
 
-    Eigen::MatrixXd B_dense = gen_random_non_singular_mat(n, 20);
+	Eigen::SparseMatrix <double> A_sparse = mps.A.sparseView();
+	Data data(A_sparse, mps.b, mps.c, mps.ub, mps.lb, mps.n_rows_eq + mps.n_rows_inq, mps.n_cols + mps.n_rows_inq + mps.n_rows_eq);
+	data.print_data(mps.Name);
 
-    // commprimindo a matriz, convertendo-a para uma matriz esparsa (seboso, nao faça)
-    Eigen::SparseMatrix<double> B = B_dense.sparseView();
+	// initialize basic matrix B
+	Eigen::SparseMatrix <double> B (data.m, data.m);
+	for (int i = 0; i < data.m; i++)
+	{
+		B.col(i) = data.A.col(data.basic_indices[i]);
+	}
+	cout << "B = \n" << MatrixXd(B) << "\n";
 
-		// Criando decomposicao LU para a matriz esparsa B usando UMFPACK
-		double *null = (double *) NULL ;
-		void *Symbolic, *Numeric ;
-
-    (void) umfpack_di_symbolic (n, n, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), &Symbolic, null, null);
-    (void) umfpack_di_numeric (B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), Symbolic, &Numeric, null, null);
-
-		// Resolvendo o sistema Bd = a varias vezes, reutilizando a mesma decomposicao LU de B para varios vetores a diferentes
-		Eigen::VectorXd d(n);
-
-		for (int i = 0; i < 100; i++)
-		{
-			Eigen::VectorXd a = Eigen::VectorXd::Random(n);
-
-			(void) umfpack_di_solve(UMFPACK_A, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), d.data(), a.data(), Numeric, null, null);
-
-			// verificando se de fato Bd = a
-			if ((B * d - a).norm() > 0.0000001)
-			{
-				std::cout << "Deu errado" << std::endl;
-				exit(0);
-			}
-		}
-
-    umfpack_di_free_symbolic (&Symbolic);
-    umfpack_di_free_numeric (&Numeric);
-
-    // gerando matriz E aleatoria (apenas a coluna e sua localizacao sao necessarias para representa-la)
-    auto [eta_idx, eta_col] = gen_random_eta_mat(n);
-
-    // matriz E representada na tora, apenas para fins ilustrativos
-    Eigen::MatrixXd E = Eigen::MatrixXd::Identity(n,n); 
-    E.col(eta_idx) = eta_col;
-    
-    std::cout << "Antiga matriz B:\n" << B.toDense() << std::endl << std::endl;
-    std::cout << "Nova matriz B:\n" << B * E << std::endl;
-
-		return 0;
+	return 0;
 }
 
-
-// n = 5 ;
-// int Ap [ ] = {0, 2, 5, 9, 10, 12} ;
-// int Ai [ ] = { 0, 1, 0, 2, 4, 1, 2, 3, 4, 2, 1, 4} ;
-// double Ax [ ] = {2., 3., 3., -1., 4., 4., -3., 1., 2., 2., 6., 1.} ;
-// double b[ ] = {8., 45., -3., 3., 19.} ;
-// double x[n] ;
-
-// double *null = (double *) NULL ;
-// void *Symbolic, *Numeric ;
-// (void) umfpack_di_symbolic (n, n, Ap, Ai, Ax, &Symbolic, null, null) ;
-// (void) umfpack_di_numeric (Ap, Ai, Ax, Symbolic, &Numeric, null, null) ;
-// umfpack_di_free_symbolic (&Symbolic) ;
-// (void) umfpack_di_solve (UMFPACK_A, Ap, Ai, Ax, x, b, Numeric, null, null) ;
-// umfpack_di_free_numeric (&Numeric) ;
-// for (i = 0 ; i < n ; i++) printf ("x [%d] = %g\n", i, x [i]) ;
-// return (0) ;
+// === EIGEN TEST ===
+// srand(time(NULL));
+// test_eigen(3); // test the eigen library with matrix 3x3
 
 
 
