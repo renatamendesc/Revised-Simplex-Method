@@ -16,6 +16,7 @@
 
 #include "mpsReader.h"
 #include "data.h"
+#include "simplex.h"
 
 using Eigen::MatrixXd;
 using namespace std;
@@ -63,7 +64,7 @@ void test_eigen(int n)
 {
 	Eigen::MatrixXd B_dense = gen_random_non_singular_mat(n, 20); // generating a random non-singular matrix
 
-	Eigen::SparseMatrix<double> B = B_dense.sparseView(); // compressing the matrix, converting it to a sparse matrix (seboso, nao faça)
+	Eigen::SparseMatrix<double> B = B_dense.sparseView(); // compressing the matrix, converting it to a sparse matrix
 
 	// Criando decomposicao LU para a matriz esparsa B usando UMFPACK
 	double *null = (double *) NULL ;
@@ -123,6 +124,21 @@ int main(int argc, char** argv)
 		B.col(i) = data.A.col(data.basic_indices[i]);
 	}
 	cout << "B = \n" << MatrixXd(B) << "\n";
+
+	// LU factorization of the initial basic matrix B
+	double *null = (double *) NULL ;
+	void *Symbolic, *Numeric ;
+
+	(void) umfpack_di_symbolic (data.m, data.m, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), &Symbolic, null, null);
+	(void) umfpack_di_numeric (B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), Symbolic, &Numeric, null, null);
+
+	Simplex simplex(data, B, Symbolic, Numeric, null);
+
+	VectorXd y = simplex.BTRAN();
+	simplex.calculate_entering_variable(y);
+
+	VectorXd d = simplex.FTRAN();
+	simplex.calculate_leaving_variable(d);
 
 	return 0;
 }

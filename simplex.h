@@ -6,15 +6,32 @@
 #include "Eigen/src/Core/Matrix.h"
 
 #include "data.h"
+#include <umfpack.h>
+#include <cstdlib>
+#include <iostream>
 
 class Simplex
 {
 public:
-    Simplex(Data &data);
+    Simplex(Data &data, Eigen::SparseMatrix<double> &B, void *Symbolic, void *Numeric, double *null);
 
-    void BTRAN (); // calculate B*y = c
-    void FTRAN (); // calculate B*d = a
+    Eigen::VectorXd BTRAN (); // solve B*y = c (basic part of reduced costs)
+    Eigen::VectorXd FTRAN (); // calculate B*d = a
 
-    Data data;
+    void calculate_entering_variable(Eigen::VectorXd &y);
+    void calculate_leaving_variable(Eigen::VectorXd &d);
+
+    Data &data;
+    Eigen::SparseMatrix <double> &B; // initial basic matrix
+    void *Symbolic;
+    void *Numeric;
+    double *null;
+
+    int entering_variable_idx;
+    Eigen::VectorXd entering_column;
+    
+    int leaving_variable_idx;
 
 };
+
+#endif
