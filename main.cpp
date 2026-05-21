@@ -125,6 +125,9 @@ int main(int argc, char** argv)
 	}
 	cout << "B = \n" << MatrixXd(B) << "\n";
 
+	exit(0);
+
+
 	// LU factorization of the initial basic matrix B
 	double *null = (double *) NULL ;
 	void *Symbolic, *Numeric ;
@@ -134,11 +137,21 @@ int main(int argc, char** argv)
 
 	Simplex simplex(data, B, Symbolic, Numeric, null);
 
+	// to-do: add function to determine initial basic solution
+
+	// for now, start with all non-basic variables fixed at their lower bounds
+	simplex.x_values = VectorXd::Zero(data.n);
+	// solve system B*x_B = b - N*x_N
+	cout << "x_values = \n" << simplex.x_values.transpose() << "\n";
+	exit(0);
+
 	VectorXd y = simplex.BTRAN();
 	simplex.calculate_entering_variable(y);
 
 	VectorXd d = simplex.FTRAN();
 	simplex.calculate_leaving_variable(d);
+
+	simplex.update_basic_matrix();
 
 	return 0;
 }

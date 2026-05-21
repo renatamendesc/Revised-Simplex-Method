@@ -45,28 +45,30 @@ void Simplex::calculate_entering_variable(VectorXd &y)
 
     cout << "reduced costs = " << reduced_costs.transpose() << endl;
 
-    // index in non_basic_indices with biggest reduced cost (maximize)
-    int most_positive_reduced_cost_idx = 0;
-    double most_positive_reduced_cost = reduced_costs(0);
-    for (int i = 1; i < k; ++i) {
-        if (reduced_costs(i) > most_positive_reduced_cost) {
-            most_positive_reduced_cost = reduced_costs(i);
-            most_positive_reduced_cost_idx = i;
+    // explore non-basic variables
+    for (int i = 0; i < k; ++i) {
+        int j = data.non_basic_indices[i];
+
+        // explicit bounds: if the reduced cost is positive and variable still can be increased
+        if (reduced_costs(i) > 0 && this->x_values(j) < this->data.ub(j))
+        {
+            this->entering_variable_idx = j;
+            this->entering_column = VectorXd(this->data.A.col(j));
+            this->entering_direction = 1;
+            break;
+        }
+        // explicit bounds: if the reduced cost is negative and variable still can be decreased
+        else if (reduced_costs(i) < 0 && this->x_values(j) > this->data.lb(j))
+        {
+            this->entering_variable_idx = j;
+            this->entering_column = VectorXd(this->data.A.col(j));
+            this->entering_direction = -1;
+            break;
         }
     }
 
-    this->entering_variable_idx = data.non_basic_indices[most_positive_reduced_cost_idx];
-    this->entering_column = VectorXd(data.A.col(this->entering_variable_idx));
-
-    cout << "most positive reduced cost = " << most_positive_reduced_cost << endl;
-    cout << "entering column index = " << this->entering_variable_idx << endl;
+    cout << "entering variable index = " << this->entering_variable_idx << endl;
     cout << "entering column = " << this->entering_column.transpose() << endl;
-
-    // if the most positive reduced cost is 0, the solution is optimal
-    if (most_positive_reduced_cost == 0) {
-        cout << "Found optimal." << endl;
-        exit(0);
-    }
 }
 
 VectorXd Simplex::FTRAN()
@@ -92,7 +94,35 @@ VectorXd Simplex::FTRAN()
 
 void Simplex::calculate_leaving_variable(VectorXd &d)
 {
-    // calculate leaving variable (l_i = b_i / d_i)
+    // calculate leaving variable
 
-    // to-do: implement version with explicit bounds
+    // explore basic variables
+    double step_size = 0;
+    double min_step_size = numeric_limits<double>::infinity();
+    for (int i = 0; i < this->data.m; i++)
+    {
+        // calculate the change in the basic variables: x_b_new = x_b_old - d * step_size
+        int j = this->data.basic_indices[i];
+
+        if (d(i) * this->entering_direction > 0) // variable increases
+        {
+            step_size = (this->data.ub(j) - this->x_values(j)) / abs(d(i));
+        }
+        else if (d(i) * this->entering_direction < 0) // variable decreases
+        {
+            step_size = (this->x_values(j) - this->data.lb(j)) / abs(d(i));
+        }
+
+        if (step_size < min_step_size)
+        {
+            min_step_size = step_size;
+            this->leaving_variable_idx = j;
+        }
+    }
+}
+
+void Simplex::update_basic_matrix()
+{
+    // update the basic matrix
+    
 }

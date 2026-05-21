@@ -21,6 +21,8 @@ public:
     void calculate_entering_variable(Eigen::VectorXd &y);
     void calculate_leaving_variable(Eigen::VectorXd &d);
 
+    Eigen::VectorXd x_values;
+
     Data &data;
     Eigen::SparseMatrix <double> &B; // initial basic matrix
     void *Symbolic;
@@ -28,9 +30,12 @@ public:
     double *null;
 
     int entering_variable_idx;
+    int entering_direction; // 1 for increase, -1 for decrease
     Eigen::VectorXd entering_column;
     
     int leaving_variable_idx;
+
+    void update_basic_matrix();
 
 };
 
