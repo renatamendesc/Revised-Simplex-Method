@@ -125,9 +125,6 @@ int main(int argc, char** argv)
 	}
 	cout << "B = \n" << MatrixXd(B) << "\n";
 
-	exit(0);
-
-
 	// LU factorization of the initial basic matrix B
 	double *null = (double *) NULL ;
 	void *Symbolic, *Numeric ;
@@ -137,21 +134,60 @@ int main(int argc, char** argv)
 
 	Simplex simplex(data, B, Symbolic, Numeric, null);
 
-	// to-do: add function to determine initial basic solution
-
+	// =======================================================================
+	// determine initial basic solution
 	// for now, start with all non-basic variables fixed at their lower bounds
-	simplex.x_values = VectorXd::Zero(data.n);
-	// solve system B*x_B = b - N*x_N
-	cout << "x_values = \n" << simplex.x_values.transpose() << "\n";
-	exit(0);
+	Eigen::VectorXd x_N(data.n - data.m);
+    Eigen::MatrixXd N = Eigen::MatrixXd::Zero(data.m, data.n - data.m);
 
-	VectorXd y = simplex.BTRAN();
-	simplex.calculate_entering_variable(y);
+    for (int i = 0; i < data.n - data.m; i++)
+    {
+        int j = data.non_basic_indices[i];
+        N.col(i) = data.A.col(j);
+        if (data.ub[j] == pInf && data.lb[j] == nInf)
+            x_N[i] = 0;
+        else if (data.lb[j] == -pInf)
+            x_N[i] = data.ub[j];
+        else
+            x_N[i] = data.lb[j];
+    }
 
-	VectorXd d = simplex.FTRAN();
-	simplex.calculate_leaving_variable(d);
+    // solving B * x_B = b - N*x_N
+	Eigen::VectorXd b = data.b - N * x_N;
+	Eigen::VectorXd x_B = Eigen::VectorXd::Zero(data.m);
 
-	simplex.update_basic_matrix();
+    (void)umfpack_di_solve(UMFPACK_A, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), x_B.data(), b.data(), Numeric, null, null);
+
+
+	simplex.x_values = Eigen::VectorXd::Zero(data.n);
+	for (int i = 0; i < data.n - data.m; i++)
+	{
+		simplex.x_values[data.non_basic_indices[i]] = x_N[i];
+	}
+	for (int i = 0; i < data.m; i++)
+	{
+		simplex.x_values[data.basic_indices[i]] = x_B[i];
+	}
+
+	cout << "\nx_values = " << simplex.x_values.transpose() << "\n";
+	// =======================================================================
+
+	while (true)
+	{
+		VectorXd y = simplex.BTRAN();
+		bool found_entering_variable = simplex.calculate_entering_variable(y);
+		if (!found_entering_variable)
+		{
+			cout << "Solution is optimal!" << endl;
+			// to-do: add function to print the solution
+			return 0;
+		}
+	
+		VectorXd d = simplex.FTRAN();
+		simplex.calculate_leaving_variable(d);
+	
+		simplex.update_basis(d);
+	}
 
 	return 0;
 }

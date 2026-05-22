@@ -1,0 +1,19 @@
+NAME          EX
+ROWS
+ N  COST
+ L  LIM1
+ L  LIM2
+ L  LIM3
+
+COLUMNS
+    X1        COST                -3    LIM1               0.5
+    X1        LIM2               0.1    LIM3               0.4
+
+    X2        COST                -2    LIM1               0.3
+    X2        LIM2               0.2    LIM3               0.5
+
+RHS
+    RHS1      LIM1                 3    LIM2                 1
+    RHS1      LIM3                 3
+
+ENDATA
