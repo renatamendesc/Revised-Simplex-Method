@@ -34,9 +34,10 @@ public:
     Eigen::VectorXd entering_column;
     
     int leaving_variable_idx;
+    double min_step_size;
 
     void update_basis(Eigen::VectorXd &d);
-    std::vector<Eigen::VectorXd> eta_matrix_col;
+    std::vector<std::pair <int, Eigen::VectorXd>> eta_matrix_col;
 
 };
 
