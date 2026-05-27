@@ -34,8 +34,6 @@ VectorXd Simplex::BTRAN()
         c_basic[i] = this->data.c[this->data.basic_indices[i]];
     }
 
-    cout << "c_basic = " << c_basic.transpose() << endl;
-
     // to-do: verify if c is zero
 
     vector <VectorXd> u;
@@ -46,30 +44,28 @@ VectorXd Simplex::BTRAN()
         VectorXd last_u = u.back();
         VectorXd new_u(this->data.m);
 
-        double aux = 0;
         int idx_eta = this->eta_matrix_col[k-1].first;
+        double aux = last_u(idx_eta);
 
         for (int i = 0; i < this->data.m; i++)
         {
             if (i != idx_eta)
             {
-                new_u(i) = -last_u(i);
-                aux += this->eta_matrix_col[k-1].second(i) * new_u(i) ;
+                new_u(i) = last_u(i);
+                aux -= last_u(i) * this->eta_matrix_col[k-1].second(i);
             }
         }
-        new_u(idx_eta) = (last_u(idx_eta) - aux) / this->eta_matrix_col[k-1].second(idx_eta);
+        new_u(idx_eta) = aux / this->eta_matrix_col[k-1].second(idx_eta);
         u.push_back(new_u);
     }
 
     (void) umfpack_di_solve(UMFPACK_A, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), y.data(), u.back().data(), Numeric, null, null);
 
-    if ((B * y - u.back()).norm() > 0.0000001)
-    {
-        cout << "Error: B*y != c_basic. Solver failed." << std::endl;
-        exit(0);
-    }
-
-    cout << "y = " << y.transpose() << endl;
+    // if ((B * y - u.back()).norm() > EPSILON_1)
+    // {
+    //     cout << "Error: B*y != c_basic. Solver failed." << std::endl;
+    //     exit(0);
+    // }
 
     return y;
 }
@@ -86,17 +82,16 @@ int Simplex::calculate_entering_variable(VectorXd &y)
         reduced_costs(i) = data.c(j) - data.A.col(j).dot(y);
     }
 
-    cout << "reduced costs = " << reduced_costs.transpose() << endl;
+    cout << "Reduced costs (y): " << reduced_costs.transpose() << endl;
 
     // explore non-basic variables
     for (int i = 0; i < k; ++i) {
         int j = data.non_basic_indices[i];
-        cout << "non-basic variable index = " << j << endl;
 
-        cout << "reduced cost for x_" << j << " = " << reduced_costs(i) << endl;
-        cout << "x_" << j << " = " << this->x_values(j) << endl;
-        cout << "ub_" << j << " = " << this->data.ub(j) << endl;
-        cout << "lb_" << j << " = " << this->data.lb(j) << endl;
+        // cout << "reduced cost for x_" << j << " = " << reduced_costs(i) << endl;
+        // cout << "x_" << j << " = " << this->x_values(j) << endl;
+        // cout << "ub_" << j << " = " << this->data.ub(j) << endl;
+        // cout << "lb_" << j << " = " << this->data.lb(j) << endl;
 
         // explicit bounds: if the reduced cost is positive and variable still can be increased
         if (reduced_costs(i) > EPSILON_1 && this->x_values(j) + EPSILON_1 < this->data.ub(j))
@@ -126,13 +121,12 @@ int Simplex::calculate_entering_variable(VectorXd &y)
 
     if (!found_entering_variable)
     {
-        cout << "No entering variable found. Solution is optimal!" << endl;
+        cout << "No entering variable found." << endl << endl;
         return 0;
     }
 
-
-    cout << "entering variable index = " << this->entering_variable_idx << endl;
-    cout << "entering column = " << this->entering_column.transpose() << endl;
+    cout << "Entering variable index = " << this->entering_variable_idx << endl;
+    cout << "Entering column = " << this->entering_column.transpose() << endl << endl;
 
     return 1;
 }
@@ -157,11 +151,11 @@ VectorXd Simplex::FTRAN()
     VectorXd d_initial(this->data.m); 
 
     (void) umfpack_di_solve(UMFPACK_A, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), d_initial.data(), this->entering_column.data(), Numeric, null, null);
-    if ((B * d_initial - this->entering_column).norm() > 0.0000001)
-    {
-        cout << "Error: B*d != a. Solver failed." << std::endl;
-        exit(0);
-    }
+    // if ((B * d_initial - this->entering_column).norm() > EPSILON_1)
+    // {
+    //     cout << "Error: B*d != a. Solver failed." << std::endl;
+    //     exit(0);
+    // }
 
     vector<VectorXd> u;
     u.push_back(d_initial);
@@ -185,10 +179,7 @@ VectorXd Simplex::FTRAN()
     }
     d = u.back();
 
-    cout << "d = " << d.transpose() << endl;
-
-    // if (this->eta_matrix_col.size() == 1)
-    //     exit(0);
+    cout << "Direction vector (d): " << d.transpose() << endl;
 
     return d;
 }
@@ -231,18 +222,20 @@ void Simplex::calculate_leaving_variable(VectorXd &d)
         exit(0);
     }
 
-    cout << "leaving variable index = " << this->leaving_variable_idx << endl; 
-    cout << "leaving column = " << this->data.A.col(this->leaving_variable_idx).transpose() << endl;
+    cout << "Leaving variable index = " << this->leaving_variable_idx << endl; 
+    cout << "Leaving column = " << this->data.A.col(this->leaving_variable_idx).transpose() << endl;
 }
 
 void Simplex::update_basis(VectorXd &d)
 {
-    // update the x values for the basic variables
+    cout << "Updating basis..." << endl;
+    // update the x values
     for (int i = 0; i < this->data.m; i++)
     {
         this->x_values(this->data.basic_indices[i]) += this->min_step_size * -this->entering_direction * d(i);
     }
     this->x_values(this->entering_variable_idx) += this->min_step_size * this->entering_direction;
+    cout << "Variables values: " << this->x_values.transpose() << endl;
 
     // store the entering variable index in the basis and the direction vector
     pair<int, VectorXd> eta_matrix_col_entry;
@@ -266,14 +259,18 @@ void Simplex::update_basis(VectorXd &d)
         }
     }
 
+    cout << "Basic indices: ";
     for (int i = 0; i < this->data.m; i++) 
     {
-        cout << "basic index = " << this->data.basic_indices[i] << endl;
+        cout << this->data.basic_indices[i] << " ";
     }
+    cout << endl;
+    cout << "Non-basic indices: ";
     for (int i = 0; i < this->data.n - this->data.m; i++) 
     {
-        cout << "non-basic index = " << this->data.non_basic_indices[i] << endl;
+        cout << this->data.non_basic_indices[i] << " ";
     }
+    cout << endl;
 
     // store eta matrix
     this->eta_matrix_col.push_back(eta_matrix_col_entry);

@@ -176,7 +176,7 @@ int main(int argc, char** argv)
 		simplex.x_values[data.basic_indices[i]] = x_B[i];
 	}
 
-	cout << "\nx_values = " << simplex.x_values.transpose() << "\n";
+	cout << "\nx_values = " << simplex.x_values.transpose() << endl;
 	// =======================================================================
 
 	int iter = 0;
@@ -187,16 +187,16 @@ int main(int argc, char** argv)
 			exit(0);
 		}
 
-		cout << "================================================" << endl;
-		cout << "Iteration " << iter+1 << endl;
-		cout << "================================================" << endl;
+		cout << endl << "================================================" << endl;
+		cout << "Iter: " << iter+1 << endl;
+		cout << "================================================" << endl << endl;
 
 		VectorXd y = simplex.BTRAN();
 		bool found_entering_variable = simplex.calculate_entering_variable(y);
 		if (!found_entering_variable)
 		{
 			cout << "Solution is optimal!" << endl;
-			// to-do: add function to print the solution
+			cout << "Objetive value = " << data.c.transpose() * simplex.x_values << endl << endl;
 			return 0;
 		}
 	
@@ -210,10 +210,6 @@ int main(int argc, char** argv)
 
 	return 0;
 }
-
-// === EIGEN TEST ===
-// srand(time(NULL));
-// test_eigen(3); // test the eigen library with matrix 3x3
 
 
 
