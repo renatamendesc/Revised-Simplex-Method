@@ -18,15 +18,15 @@ public:
     Eigen::VectorXd BTRAN (); // solve B*y = c (basic part of reduced costs)
     Eigen::VectorXd FTRAN (); // calculate B*d = a
 
-    int calculate_entering_variable(Eigen::VectorXd &y); // returns 1 if entering variable found, 0 if solution is optimal
-    void calculate_leaving_variable(Eigen::VectorXd &d);
+    int calculate_entering_variable (Eigen::VectorXd &y); // returns 1 if entering variable found, 0 if solution is optimal
+    void calculate_leaving_variable (Eigen::VectorXd &d);
 
     Eigen::VectorXd x_values;
 
     Data &data;
     Eigen::SparseMatrix <double> &B; // initial basic matrix
-    void *Symbolic;
-    void *Numeric;
+    void *Symbolic = nullptr;
+    void *Numeric = nullptr;
     double *null;
 
     int entering_variable_idx;
@@ -36,8 +36,10 @@ public:
     int leaving_variable_idx;
     double min_step_size;
 
-    void update_basis(Eigen::VectorXd &d);
+    void update_basis (Eigen::VectorXd &d);
     std::vector<std::pair <int, Eigen::VectorXd>> eta_matrix_col;
+
+    void refactorization ();
 
 };
 

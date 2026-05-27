@@ -5,12 +5,34 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using Eigen::SparseMatrix;
 
+#define REFACTOR 2 // refactorization every 20 iterations
 
 double EPSILON_1 = 1e-5;
 
-Simplex::Simplex(Data &data, SparseMatrix <double> &B, void *Symbolic, void *Numeric, double *null) : data(data), B(B), Symbolic(Symbolic), Numeric(Numeric), null(null) {}
+Simplex::Simplex (Data &data, SparseMatrix <double> &B, void *Symbolic, void *Numeric, double *null) : data(data), B(B), Symbolic(Symbolic), Numeric(Numeric), null(null) {}
 
-VectorXd Simplex::BTRAN()
+void Simplex::refactorization ()
+{
+    cout << endl << "Refactoring..." << endl;
+    // update current basis
+    for (int i = 0; i < this->data.m; i++)
+    {
+        this->B.col(i) = this->data.A.col(this->data.basic_indices[i]);
+    }
+
+    // delete eta matrices
+    this->eta_matrix_col.clear();
+
+    // delete symbolic and numeric factorization
+    umfpack_di_free_symbolic(&this->Symbolic);
+    umfpack_di_free_numeric(&this->Numeric);
+
+    // create new symbolic and numeric factorization
+    umfpack_di_symbolic(this->data.m, this->data.m, this->B.outerIndexPtr(), this->B.innerIndexPtr(), this->B.valuePtr(), &this->Symbolic, this->null, this->null);
+    umfpack_di_numeric(this->B.outerIndexPtr(), this->B.innerIndexPtr(), this->B.valuePtr(), this->Symbolic, &this->Numeric, this->null, this->null);
+}
+
+VectorXd Simplex::BTRAN ()
 {
     // calculate y*B = c
 
@@ -26,7 +48,7 @@ VectorXd Simplex::BTRAN()
     // y * E_1 = u_1
     // ==============================
 
-    VectorXd y(this->data.m); // vector with dual multipliers
+    VectorXd y = VectorXd::Zero(this->data.m); // vector with dual multipliers
     VectorXd c_basic(this->data.m);
 
     for (int i = 0; i < this->data.m; i++)
@@ -59,7 +81,7 @@ VectorXd Simplex::BTRAN()
         u.push_back(new_u);
     }
 
-    (void) umfpack_di_solve(UMFPACK_A, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), y.data(), u.back().data(), Numeric, null, null);
+    (void) umfpack_di_solve(UMFPACK_At, this->B.outerIndexPtr(), this->B.innerIndexPtr(), this->B.valuePtr(), y.data(), (u.back()).data(), this->Numeric, this->null, this->null);
 
     // if ((B * y - u.back()).norm() > EPSILON_1)
     // {
@@ -70,7 +92,7 @@ VectorXd Simplex::BTRAN()
     return y;
 }
 
-int Simplex::calculate_entering_variable(VectorXd &y)
+int Simplex::calculate_entering_variable (VectorXd &y)
 {
     bool found_entering_variable = false;
     
@@ -131,7 +153,7 @@ int Simplex::calculate_entering_variable(VectorXd &y)
     return 1;
 }
 
-VectorXd Simplex::FTRAN()
+VectorXd Simplex::FTRAN ()
 {
     // calculate B*d = a
     
@@ -150,7 +172,7 @@ VectorXd Simplex::FTRAN()
     VectorXd d(this->data.m); // direction vector
     VectorXd d_initial(this->data.m); 
 
-    (void) umfpack_di_solve(UMFPACK_A, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), d_initial.data(), this->entering_column.data(), Numeric, null, null);
+    (void) umfpack_di_solve(UMFPACK_A, this->B.outerIndexPtr(), this->B.innerIndexPtr(), this->B.valuePtr(), d_initial.data(), this->entering_column.data(), this->Numeric, this->null, this->null);
     // if ((B * d_initial - this->entering_column).norm() > EPSILON_1)
     // {
     //     cout << "Error: B*d != a. Solver failed." << std::endl;
@@ -184,7 +206,7 @@ VectorXd Simplex::FTRAN()
     return d;
 }
 
-void Simplex::calculate_leaving_variable(VectorXd &d)
+void Simplex::calculate_leaving_variable (VectorXd &d)
 {
     // calculate leaving variable
 
@@ -226,7 +248,7 @@ void Simplex::calculate_leaving_variable(VectorXd &d)
     cout << "Leaving column = " << this->data.A.col(this->leaving_variable_idx).transpose() << endl;
 }
 
-void Simplex::update_basis(VectorXd &d)
+void Simplex::update_basis (VectorXd &d)
 {
     cout << "Updating basis..." << endl;
     // update the x values
@@ -274,4 +296,9 @@ void Simplex::update_basis(VectorXd &d)
 
     // store eta matrix
     this->eta_matrix_col.push_back(eta_matrix_col_entry);
+
+    if (this->eta_matrix_col.size() == REFACTOR)
+    {
+        this->refactorization();
+    }
 }
