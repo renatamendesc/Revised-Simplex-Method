@@ -10,9 +10,9 @@
 #include <vector>
 #include <algorithm>
 #include <map>
-
 #include <stdio.h>
 #include <umfpack.h>
+#include <chrono>
 
 #include "mpsReader.h"
 #include "data.h"
@@ -104,41 +104,53 @@ double nInf = -numeric_limits<double>::infinity();
 // 	std::cout << "Nova matriz B:\n" << B * E << std::endl;
 // }
 
-
-int main(int argc, char** argv)
+bool verify_feasibility(mpsReader &mps, Data &data_phase_1, Eigen::VectorXd &x_values)
 {
-	std::string mps_path = argv[1];
-	int pre_process = std::stoi(argv[2]); // can be 1 or 0 to activate it or not
+	data_phase_1.restore_original_data(mps.c, mps.ub, mps.lb);
 
-	mpsReader mps;
-	mps.read(mps_path, pre_process);
+	double violation_value = 0;
+	bool violation_found = false;
+	data_phase_1.c = Eigen::VectorXd::Zero(data_phase_1.n);
 
-	Eigen::SparseMatrix <double> A_sparse = mps.A.sparseView();
-	const int m = mps.n_rows_eq + mps.n_rows_inq;
-	const int n = mps.n_cols + mps.n_rows_inq; // must match A.cols() and length of c, lb, ub
-	Data data(A_sparse, mps.b, mps.c, mps.ub, mps.lb, m, n);
-	data.print_data(mps.Name);
-
-	// initialize basic matrix B
-	Eigen::SparseMatrix <double> B (data.m, data.m);
-	for (int i = 0; i < data.m; i++)
+	// verify wether basic veriable violate the bounds
+	for (int i = 0; i < data_phase_1.basic_indices.size(); i++)
 	{
-		B.col(i) = data.A.col(data.basic_indices[i]);
+		int j = data_phase_1.basic_indices[i];
+		if (x_values[j] < data_phase_1.lb[j])
+		{
+			cout << "Basic variable " << j << " violates the lower bound!" << endl;
+			data_phase_1.ub[j] = data_phase_1.lb[j];
+			data_phase_1.lb[j] = nInf;
+			data_phase_1.c[j] = 1;
+			violation_value += data_phase_1.lb[j] - x_values[j];
+
+			violation_found = true;
+		}
+		else if (x_values[j] > data_phase_1.ub[j])
+		{
+			cout << "Basic variable " << j << " violates the upper bound!" << endl;
+			data_phase_1.lb[j] = data_phase_1.ub[j];
+			data_phase_1.ub[j] = pInf;
+			data_phase_1.c[j] = -1;
+			violation_value += x_values[j] - data_phase_1.ub[j];
+
+			violation_found = true;
+		}
 	}
-	cout << "B = \n" << MatrixXd(B) << "\n";
 
-	// LU factorization of the initial basic matrix B
-	double *null = (double *) NULL ;
-	void *Symbolic, *Numeric ;
+	if (!violation_found)
+	{
+		return true;
+	}
+	else
+	{
+		return violation_value > 1e-5;
+	}
 
-	(void) umfpack_di_symbolic (data.m, data.m, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), &Symbolic, null, null);
-	(void) umfpack_di_numeric (B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), Symbolic, &Numeric, null, null);
+}
 
-	Simplex simplex(data, B, Symbolic, Numeric, null);
-
-	// =======================================================================
-	// determine initial basic solution
-	// for now, start with all non-basic variables fixed at their lower bounds
+void generate_initial_basic_solution(Data &data, Simplex &simplex, Eigen::SparseMatrix<double> &B, void *Symbolic, void *Numeric, double *null)
+{
 	Eigen::VectorXd x_N(data.n - data.m);
     Eigen::MatrixXd N = Eigen::MatrixXd::Zero(data.m, data.n - data.m);
 
@@ -155,15 +167,8 @@ int main(int argc, char** argv)
     }
 
     // solving B * x_B = b - N*x_N
-    if (data.b.size() != data.m || N.rows() != data.m || N.cols() != x_N.size())
-    {
-        cerr << "Dimension mismatch: b.size()=" << data.b.size() << " m=" << data.m
-             << " N=" << N.rows() << "x" << N.cols() << " x_N.size()=" << x_N.size() << endl;
-        return 1;
-    }
 	Eigen::VectorXd rhs = data.b - N * x_N;
 	Eigen::VectorXd x_B = Eigen::VectorXd::Zero(data.m);
-
     (void)umfpack_di_solve(UMFPACK_A, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), x_B.data(), rhs.data(), Numeric, null, null);
 
 	simplex.x_values = Eigen::VectorXd::Zero(data.n);
@@ -177,26 +182,77 @@ int main(int argc, char** argv)
 	}
 
 	cout << "\nx_values = " << simplex.x_values.transpose() << endl;
-	// =======================================================================
+
+}
+
+int main(int argc, char** argv)
+{
+	std::string mps_path = argv[1];
+	int pre_process = std::stoi(argv[2]); // can be 1 or 0 to activate it or not
+
+	mpsReader mps;
+	mps.read(mps_path, pre_process);
+
+	Eigen::SparseMatrix <double> A_sparse = mps.A.sparseView();
+	const int m = mps.n_rows_eq + mps.n_rows_inq;
+	const int n = mps.n_cols + mps.n_rows_inq; // must match A.cols() and length of c, lb, ub
+	Data data(A_sparse, mps.b, mps.c, mps.ub, mps.lb, m, n);
+	data.print_data(mps.Name);
+
+	auto start = std::chrono::steady_clock::now();
+
+	// initialize basic matrix B
+	Eigen::SparseMatrix <double> B (data.m, data.m);
+	for (int i = 0; i < data.m; i++)
+	{
+		B.col(i) = data.A.col(data.basic_indices[i]);
+	}
+	cout << "B = \n" << MatrixXd(B) << "\n";
+
+	// LU factorization of the initial basic matrix B
+	double *null = (double *) NULL ;
+	void *Symbolic, *Numeric ;
+
+	(void) umfpack_di_symbolic (data.m, data.m, B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), &Symbolic, null, null);
+	(void) umfpack_di_numeric (B.outerIndexPtr(), B.innerIndexPtr(), B.valuePtr(), Symbolic, &Numeric, null, null);
+
+	Simplex simplex(data, B, Symbolic, Numeric, null, 1);
+
+	// phase 1: determine initial basic solution
+	generate_initial_basic_solution(data, simplex, B, Symbolic, Numeric, null);
 
 	int iter = 0;
 	while (true)
 	{
-		if (iter == 4)
+		if (simplex.phase == 1 && verify_feasibility(mps, simplex.data, simplex.x_values))
 		{
-			exit(0);
+			simplex.phase = 2;
+
+			cout << endl << "================================================" << endl;
+			cout << "Phase 2 started!" << endl;
+			cout << "================================================" << endl;
+
+			simplex.data.restore_original_data(mps.c, mps.ub, mps.lb);
 		}
+
+		// if (iter == 327)
+		// {
+		// 	exit(0);
+		// }
 
 		cout << endl << "================================================" << endl;
 		cout << "Iter: " << iter+1 << endl;
 		cout << "================================================" << endl << endl;
-
 		VectorXd y = simplex.BTRAN();
 		bool found_entering_variable = simplex.calculate_entering_variable(y);
 		if (!found_entering_variable)
 		{
 			cout << "Solution is optimal!" << endl;
-			cout << "Objetive value = " << data.c.transpose() * simplex.x_values << endl << endl;
+			cout << "Objetive value = " << (-mps.c).transpose() * simplex.x_values << endl;
+
+			auto end = std::chrono::steady_clock::now();
+			chrono::duration<double> elapsed_time = end - start;
+			cout << "Time (seconds) = " << elapsed_time.count() << endl << endl;
 			return 0;
 		}
 	

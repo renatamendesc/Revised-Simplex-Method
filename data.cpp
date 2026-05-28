@@ -26,6 +26,13 @@ Data::Data(SparseMatrix <double> &A, VectorXd &b, VectorXd &c, VectorXd &ub, Vec
     }
 }
 
+void Data::restore_original_data(VectorXd &c,VectorXd &ub, VectorXd &lb)
+{
+    this->c = -c;
+    this->ub = ub;
+    this->lb = lb;
+}   
+
 void Data::print_data(string instance_name)
 {
     std::cout << "\n============ Instance " << instance_name << " data ============\n\n";

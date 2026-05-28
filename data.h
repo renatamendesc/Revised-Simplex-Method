@@ -16,6 +16,8 @@ public:
     Data(Eigen::SparseMatrix <double> &A, Eigen::VectorXd &b, Eigen::VectorXd &c, Eigen::VectorXd &ub, Eigen::VectorXd &lb, int m, int n);
     void print_data(std::string instance_name);
 
+    void restore_original_data(Eigen::VectorXd &c,Eigen::VectorXd &ub, Eigen::VectorXd &lb);
+
     int m;
     int n;
 

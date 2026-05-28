@@ -5,11 +5,11 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using Eigen::SparseMatrix;
 
-#define REFACTOR 2 // refactorization every 20 iterations
+#define REFACTOR 20 // refactorization every 20 iterations
 
 double EPSILON_1 = 1e-5;
 
-Simplex::Simplex (Data &data, SparseMatrix <double> &B, void *Symbolic, void *Numeric, double *null) : data(data), B(B), Symbolic(Symbolic), Numeric(Numeric), null(null) {}
+Simplex::Simplex (Data &data, SparseMatrix <double> &B, void *Symbolic, void *Numeric, double *null, int phase) : data(data), B(B), Symbolic(Symbolic), Numeric(Numeric), null(null), phase(phase) {}
 
 void Simplex::refactorization ()
 {
@@ -56,7 +56,7 @@ VectorXd Simplex::BTRAN ()
         c_basic[i] = this->data.c[this->data.basic_indices[i]];
     }
 
-    // to-do: verify if c is zero
+    cout << "c basic: " << c_basic.transpose() << endl;
 
     vector <VectorXd> u;
     u.push_back(c_basic);
@@ -82,10 +82,9 @@ VectorXd Simplex::BTRAN ()
     }
 
     (void) umfpack_di_solve(UMFPACK_At, this->B.outerIndexPtr(), this->B.innerIndexPtr(), this->B.valuePtr(), y.data(), (u.back()).data(), this->Numeric, this->null, this->null);
-
-    // if ((B * y - u.back()).norm() > EPSILON_1)
+    // if ((B.transpose() * y - u.back()).norm() > EPSILON_1)
     // {
-    //     cout << "Error: B*y != c_basic. Solver failed." << std::endl;
+    //     cout << "Error: B^t*y != c_basic. Solver failed." << std::endl;
     //     exit(0);
     // }
 
@@ -109,11 +108,6 @@ int Simplex::calculate_entering_variable (VectorXd &y)
     // explore non-basic variables
     for (int i = 0; i < k; ++i) {
         int j = data.non_basic_indices[i];
-
-        // cout << "reduced cost for x_" << j << " = " << reduced_costs(i) << endl;
-        // cout << "x_" << j << " = " << this->x_values(j) << endl;
-        // cout << "ub_" << j << " = " << this->data.ub(j) << endl;
-        // cout << "lb_" << j << " = " << this->data.lb(j) << endl;
 
         // explicit bounds: if the reduced cost is positive and variable still can be increased
         if (reduced_costs(i) > EPSILON_1 && this->x_values(j) + EPSILON_1 < this->data.ub(j))
@@ -211,10 +205,11 @@ void Simplex::calculate_leaving_variable (VectorXd &d)
     // calculate leaving variable
 
     this->min_step_size = numeric_limits<double>::infinity();
-    double step_size = 0;
+
     // explore basic variables
     for (int i = 0; i < this->data.m; i++)
     {
+        double step_size = numeric_limits<double>::infinity();
         // calculate the change in the basic variables: x_b_new = x_b_old - d * step_size
         int j = this->data.basic_indices[i];
         if ((abs(d(i)) < EPSILON_1))
@@ -231,16 +226,27 @@ void Simplex::calculate_leaving_variable (VectorXd &d)
             step_size = (this->x_values(j) - this->data.lb(j)) / abs(d(i));
         }
 
-        if (step_size < min_step_size)
+        if (step_size <= this->min_step_size)
         {
-            min_step_size = step_size;
-            this->leaving_variable_idx = j;
+            if (step_size == this->min_step_size)
+            {
+                if (j < this->leaving_variable_idx)
+                {
+                    this->leaving_variable_idx = j;
+                }
+            }
+            else
+            {
+                this->leaving_variable_idx = j;
+            }
+            this->min_step_size = step_size;
         }
     }
 
-    if (min_step_size == numeric_limits<double>::infinity())
+    if (this->min_step_size == numeric_limits<double>::infinity())
     {
         cout << "No leaving variable found." << endl;
+        cout << "Solution is unbounded." << endl << endl;
         exit(0);
     }
 

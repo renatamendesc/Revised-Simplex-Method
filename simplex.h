@@ -13,9 +13,9 @@
 class Simplex
 {
 public:
-    Simplex(Data &data, Eigen::SparseMatrix<double> &B, void *Symbolic, void *Numeric, double *null);
+    Simplex(Data &data, Eigen::SparseMatrix<double> &B, void *Symbolic, void *Numeric, double *null, int phase);
 
-    Eigen::VectorXd BTRAN (); // solve B*y = c (basic part of reduced costs)
+    Eigen::VectorXd BTRAN (); // solve B*y = c
     Eigen::VectorXd FTRAN (); // calculate B*d = a
 
     int calculate_entering_variable (Eigen::VectorXd &y); // returns 1 if entering variable found, 0 if solution is optimal
@@ -41,6 +41,7 @@ public:
 
     void refactorization ();
 
+    int phase; // 1 for phase 1, 2 for phase 2
 };
 
 #endif
