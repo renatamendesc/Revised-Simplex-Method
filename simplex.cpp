@@ -13,7 +13,7 @@ Simplex::Simplex (Data &data, SparseMatrix <double> &B, void *Symbolic, void *Nu
 
 void Simplex::refactorization ()
 {
-    cout << endl << "Refactoring..." << endl;
+    // cout << endl << "Refactoring..." << endl;
     // update current basis
     for (int i = 0; i < this->data.m; i++)
     {
@@ -36,18 +36,6 @@ VectorXd Simplex::BTRAN ()
 {
     // calculate y*B = c
 
-    // ==============================
-    // example: y * B_3 = c
-
-    // u * E_3 = c
-    // v * E_2 = u
-    // y * E_1 = v
-    // or
-    // u_0 * E_3 = c
-    // u_1 * E_2 = u_0
-    // y * E_1 = u_1
-    // ==============================
-
     VectorXd y = VectorXd::Zero(this->data.m); // vector with dual multipliers
     VectorXd c_basic(this->data.m);
 
@@ -56,7 +44,7 @@ VectorXd Simplex::BTRAN ()
         c_basic[i] = this->data.c[this->data.basic_indices[i]];
     }
 
-    cout << "c basic: " << c_basic.transpose() << endl;
+    // cout << "c_basic = " << c_basic.transpose() << endl;
 
     vector <VectorXd> u;
     u.push_back(c_basic);
@@ -98,15 +86,13 @@ int Simplex::calculate_entering_variable (VectorXd &y)
     // calculate reduced costs (s_j = c_j - y*A_j)
     int k = this->data.n - this->data.m;
     VectorXd reduced_costs(k);
-    for (int i = 0; i < k; ++i) {
+    for (int i = 0; i < k; i++) {
         int j = data.non_basic_indices[i];
         reduced_costs(i) = data.c(j) - data.A.col(j).dot(y);
     }
 
-    cout << "Reduced costs (y): " << reduced_costs.transpose() << endl;
-
     // explore non-basic variables
-    for (int i = 0; i < k; ++i) {
+    for (int i = 0; i < k; i++) {
         int j = data.non_basic_indices[i];
 
         // explicit bounds: if the reduced cost is positive and variable still can be increased
@@ -141,8 +127,8 @@ int Simplex::calculate_entering_variable (VectorXd &y)
         return 0;
     }
 
-    cout << "Entering variable index = " << this->entering_variable_idx << endl;
-    cout << "Entering column = " << this->entering_column.transpose() << endl << endl;
+    // cout << "Entering variable index = " << this->entering_variable_idx << endl;
+    //cout << "Entering column = " << this->entering_column.transpose() << endl << endl;
 
     return 1;
 }
@@ -150,18 +136,6 @@ int Simplex::calculate_entering_variable (VectorXd &y)
 VectorXd Simplex::FTRAN ()
 {
     // calculate B*d = a
-    
-    // ==============================
-    // example: B_3 * d = a
-
-    // E_1 * u = a
-    // E_2 * v = u
-    // E_3 * d = v
-    // or
-    // E_1 * u_0 = a
-    // E_2 * u_1 = u_0
-    // E_3 * d = u_1
-    // ==============================
 
     VectorXd d(this->data.m); // direction vector
     VectorXd d_initial(this->data.m); 
@@ -195,7 +169,7 @@ VectorXd Simplex::FTRAN ()
     }
     d = u.back();
 
-    cout << "Direction vector (d): " << d.transpose() << endl;
+    // cout << "Direction vector (d): " << d.transpose() << endl;
 
     return d;
 }
@@ -243,6 +217,13 @@ void Simplex::calculate_leaving_variable (VectorXd &d)
         }
     }
 
+    // if the leaving variable is the entering variable
+    if (this->min_step_size > this->data.ub(this->entering_variable_idx) - this->data.lb(this->entering_variable_idx) + EPSILON_1)
+    {
+        this->leaving_variable_idx = this->entering_variable_idx;
+        this->min_step_size = this->data.ub(this->entering_variable_idx) - this->data.lb(this->entering_variable_idx);
+    }
+
     if (this->min_step_size == numeric_limits<double>::infinity())
     {
         cout << "No leaving variable found." << endl;
@@ -250,26 +231,30 @@ void Simplex::calculate_leaving_variable (VectorXd &d)
         exit(0);
     }
 
-    cout << "Leaving variable index = " << this->leaving_variable_idx << endl; 
-    cout << "Leaving column = " << this->data.A.col(this->leaving_variable_idx).transpose() << endl;
+    // cout << "Leaving variable index = " << this->leaving_variable_idx << endl;
+    // cout << "Leaving column = " << this->data.A.col(this->leaving_variable_idx).transpose() << endl;
 }
 
 void Simplex::update_basis (VectorXd &d)
 {
-    cout << "Updating basis..." << endl;
+    // cout << "Updating basis..." << endl;
     // update the x values
     for (int i = 0; i < this->data.m; i++)
     {
         this->x_values(this->data.basic_indices[i]) += this->min_step_size * -this->entering_direction * d(i);
     }
     this->x_values(this->entering_variable_idx) += this->min_step_size * this->entering_direction;
-    cout << "Variables values: " << this->x_values.transpose() << endl;
+    // cout << "Variables values: " << this->x_values.transpose() << endl;
+
+    // if the entering variable is not basic
+    if (this->entering_variable_idx == this->leaving_variable_idx)
+        return;
 
     // store the entering variable index in the basis and the direction vector
     pair<int, VectorXd> eta_matrix_col_entry;
     eta_matrix_col_entry.second = d;
 
-    // update the basic matrix
+    // update the basic and non basic variables
     for (int i = 0; i < this->data.m; i++) 
     {
         if (this->data.basic_indices[i] == this->leaving_variable_idx)
@@ -278,7 +263,6 @@ void Simplex::update_basis (VectorXd &d)
             eta_matrix_col_entry.first = i;
         }
     }
-
     for (int i = 0; i < this->data.n - this->data.m; i++) 
     {
         if (this->data.non_basic_indices[i] == this->entering_variable_idx)
@@ -287,22 +271,8 @@ void Simplex::update_basis (VectorXd &d)
         }
     }
 
-    cout << "Basic indices: ";
-    for (int i = 0; i < this->data.m; i++) 
-    {
-        cout << this->data.basic_indices[i] << " ";
-    }
-    cout << endl;
-    cout << "Non-basic indices: ";
-    for (int i = 0; i < this->data.n - this->data.m; i++) 
-    {
-        cout << this->data.non_basic_indices[i] << " ";
-    }
-    cout << endl;
-
     // store eta matrix
     this->eta_matrix_col.push_back(eta_matrix_col_entry);
-
     if (this->eta_matrix_col.size() == REFACTOR)
     {
         this->refactorization();

@@ -35,15 +35,15 @@ void Data::restore_original_data(VectorXd &c,VectorXd &ub, VectorXd &lb)
 
 void Data::print_data(string instance_name)
 {
-    std::cout << "\n============ Instance " << instance_name << " data ============\n\n";
+    std::cout << "\n============ Instance " << instance_name << " data ============\n";
 
-    std::cout << "A (" << m << " x " << n << ") = \n" << MatrixXd(this->A) << "\n\n";
+    // std::cout << "\nA (" << m << " x " << n << ") = \n" << MatrixXd(this->A) << "\n\n";
 
-    std::cout << "b = " << this->b.transpose() << "\n";
-    std::cout << "c = " << this->c.transpose() << "\n\n";
+    // std::cout << "b = " << this->b.transpose() << "\n";
+    // std::cout << "c = " << this->c.transpose() << "\n\n";
 
 
-    std::cout << "lb = " << this->lb.transpose() << "\n";
-    std::cout << "ub = " << this->ub.transpose() << "\n";
-    std::cout << "\n================================================\n\n";
+    // std::cout << "lb = " << this->lb.transpose() << "\n";
+    // std::cout << "ub = " << this->ub.transpose() << "\n\n";
+    std::cout << "================================================\n\n";
 }
