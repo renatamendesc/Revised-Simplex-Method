@@ -31,7 +31,7 @@ bool apply_penalties (mpsReader &mps, Data &data_phase_1, Eigen::VectorXd &x_val
 	double violation_value = 0;
 	data_phase_1.c = Eigen::VectorXd::Zero(data_phase_1.n);
 
-	// verify wether basic veriable violate the bounds
+	// verify if basic variable violate the bounds
 	for (int i = 0; i < data_phase_1.basic_indices.size(); i++)
 	{
 		int j = data_phase_1.basic_indices[i];
@@ -103,8 +103,8 @@ int main(int argc, char** argv)
 	mps.read(mps_path, pre_process);
 
 	Eigen::SparseMatrix <double> A_sparse = mps.A.sparseView();
-	const int m = mps.n_rows_eq + mps.n_rows_inq;
-	const int n = mps.n_cols + mps.n_rows_inq; 
+	int m = mps.n_rows_eq + mps.n_rows_inq;
+	int n = mps.n_cols + mps.n_rows_inq; 
 	Data data(A_sparse, mps.b, mps.c, mps.ub, mps.lb, m, n);
 	data.print_data(mps.Name);
 
@@ -127,7 +127,7 @@ int main(int argc, char** argv)
 
 	Simplex simplex(data, B, Symbolic, Numeric, null, 1);
 
-	generate_initial_basic_solution(data, simplex, B, Symbolic, Numeric, null); // phase 1: determine initial basic solution
+	generate_initial_basic_solution(data, simplex, B, Symbolic, Numeric, null); // phase 1: determine initial solution
 
 	cout << endl << "Solving..." << endl;
 	int iter = 0;
@@ -152,7 +152,7 @@ int main(int argc, char** argv)
 		if (!found_entering_variable)
 		{
 			cout << "Solution is optimal!" << endl;
-			cout << "Objetive value = " << (mps.c).transpose() * simplex.x_values << endl;
+			cout << "Objetive value = " << (-mps.c).transpose() * simplex.x_values << endl;
 
 			auto end = std::chrono::steady_clock::now();
 			chrono::duration<double> elapsed_time = end - start;

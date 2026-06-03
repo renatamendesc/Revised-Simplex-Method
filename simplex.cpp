@@ -5,7 +5,7 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using Eigen::SparseMatrix;
 
-#define REFACTOR 20 // refactorization every 20 iterations
+#define NB_REFACTOR_ITER 20 // refactorization every 20 iterations
 
 double EPSILON_1 = 1e-5;
 
@@ -273,7 +273,7 @@ void Simplex::update_basis (VectorXd &d)
 
     // store eta matrix
     this->eta_matrix_col.push_back(eta_matrix_col_entry);
-    if (this->eta_matrix_col.size() == REFACTOR)
+    if (this->eta_matrix_col.size() == NB_REFACTOR_ITER)
     {
         this->refactorization();
     }
