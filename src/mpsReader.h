@@ -63,9 +63,9 @@
 #include <string>
 #include <fstream>
 
-#include "Eigen/Dense"
-#include "Eigen/Sparse"
-#include "Eigen/src/Core/Matrix.h"
+#include "eigen/Dense"
+#include "eigen/Sparse"
+#include "eigen/src/Core/Matrix.h"
 
 // #include "Data.h"
 

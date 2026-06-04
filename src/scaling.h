@@ -8,9 +8,9 @@
 #include <vector>
 #include <umfpack.h>
 
-#include "Eigen/Dense"
-#include "Eigen/Sparse"
-#include "Eigen/src/Core/Matrix.h"
+#include "eigen/Dense"
+#include "eigen/Sparse"
+#include "eigen/src/Core/Matrix.h"
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;

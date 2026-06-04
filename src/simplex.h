@@ -1,9 +1,9 @@
 #ifndef SIMPLEX_H
 #define SIMPLEX_H
 
-#include "Eigen/Dense"
-#include "Eigen/Sparse"
-#include "Eigen/src/Core/Matrix.h"
+#include "eigen/Dense"
+#include "eigen/Sparse"
+#include "eigen/src/Core/Matrix.h"
 
 #include "data.h"
 #include <umfpack.h>

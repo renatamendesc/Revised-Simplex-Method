@@ -1,5 +1,5 @@
 #include "mpsReader.h"
-#include "Scaling.h"
+#include "scaling.h"
 
 mpsReader::mpsReader(string fileName)
 {

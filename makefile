@@ -2,11 +2,11 @@
 CXX = g++
 
 # Compiler flags
-CXXFLAGS = -I ./ -std=c++11 -Wall -I /usr/include/suitesparse -O3
+CXXFLAGS = -I . -Isrc -std=c++11 -Wall -I /usr/include/suitesparse -O3
 LDFLAGS = -lumfpack -lcholmod -lamd -lsuitesparseconfig
 
 # Source and object files
-SRC_DIR = .
+SRC_DIR = src
 OBJ_DIR = obj
 SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRCS))

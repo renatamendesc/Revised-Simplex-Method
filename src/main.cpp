@@ -1,8 +1,8 @@
 #include <iostream>
 #include <cstdlib>
-#include "Eigen/Dense"
-#include "Eigen/Sparse"
-#include "Eigen/src/Core/Matrix.h"
+#include "eigen/Dense"
+#include "eigen/Sparse"
+#include "eigen/src/Core/Matrix.h"
 
 #include <numeric>
 #include <ostream>
@@ -54,9 +54,9 @@ bool apply_penalties (mpsReader &mps, Data &data_phase_1, Eigen::VectorXd &x_val
 	}
 
 	if (violation_value < 1e-5)
-		return true;
-	else
 		return false;
+	else
+		return true;
 }
 
 void generate_initial_basic_solution(Data &data, Simplex &simplex, Eigen::SparseMatrix<double> &B, void *Symbolic, void *Numeric, double *null)
@@ -97,10 +97,9 @@ void generate_initial_basic_solution(Data &data, Simplex &simplex, Eigen::Sparse
 int main(int argc, char** argv)
 {
 	std::string mps_path = argv[1];
-	int pre_process = std::stoi(argv[2]); // can be 1 or 0 to activate it or not
 
 	mpsReader mps;
-	mps.read(mps_path, pre_process);
+	mps.read(mps_path, 0);
 
 	Eigen::SparseMatrix <double> A_sparse = mps.A.sparseView();
 	int m = mps.n_rows_eq + mps.n_rows_inq;
@@ -129,11 +128,11 @@ int main(int argc, char** argv)
 
 	generate_initial_basic_solution(data, simplex, B, Symbolic, Numeric, null); // phase 1: determine initial solution
 
-	cout << endl << "Solving..." << endl;
+	cout << "Solving..." << endl;
 	int iter = 0;
 	while (true)
 	{
-		if (simplex.phase == 1 && apply_penalties(mps, simplex.data, simplex.x_values))
+		if (simplex.phase == 1 && !apply_penalties(mps, simplex.data, simplex.x_values))
 		{
 			simplex.phase = 2;
 
@@ -152,7 +151,7 @@ int main(int argc, char** argv)
 		if (!found_entering_variable)
 		{
 			cout << "Solution is optimal!" << endl;
-			cout << "Objetive value = " << (-mps.c).transpose() * simplex.x_values << endl;
+			cout << "Objetive value = " << (mps.c).transpose() * simplex.x_values << endl;
 
 			auto end = std::chrono::steady_clock::now();
 			chrono::duration<double> elapsed_time = end - start;

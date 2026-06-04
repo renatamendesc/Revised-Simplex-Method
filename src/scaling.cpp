@@ -1,4 +1,4 @@
-#include "Scaling.h"
+#include "scaling.h"
 
 #include <cmath>
 

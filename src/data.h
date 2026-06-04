@@ -1,9 +1,9 @@
 #ifndef DATA_H
 #define DATA_H
 
-#include "Eigen/Dense"
-#include "Eigen/Sparse"
-#include "Eigen/src/Core/Matrix.h"
+#include "eigen/Dense"
+#include "eigen/Sparse"
+#include "eigen/src/Core/Matrix.h"
 
 #include <iostream>
 #include <string>
